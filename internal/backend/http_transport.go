@@ -23,6 +23,9 @@ type TransportOptions struct {
 
 	// contains the name of a file containing the TLS client certificate and private key in PEM format
 	TLSClientCertKeyFilename string
+	
+	// The size of the TCP send buffer to use (in KiB)
+	TcpSendBufferSize int
 }
 
 // readPEMCertKey reads a file and returns the PEM encoded certificate and key
@@ -77,8 +80,10 @@ func Transport(opts TransportOptions) (http.RoundTripper, error) {
 			if err != nil {
 				return c, err
 			}
-			if tc, ok := c.(*net.TCPConn); ok {
-				tc.SetWriteBuffer(5000000)
+			if opts.TcpSendBufferSize != 0 {
+				if tc, ok := c.(*net.TCPConn); ok {
+					tc.SetWriteBuffer(opts.TcpSendBufferSize * 1024)
+				}
 			}
 			return c, err
 		},
