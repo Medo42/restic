@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -22,6 +23,9 @@ type TransportOptions struct {
 
 	// contains the name of a file containing the TLS client certificate and private key in PEM format
 	TLSClientCertKeyFilename string
+	
+	// The size of the TCP send buffer to use (in KiB)
+	TcpSendBufferSize int
 }
 
 // readPEMCertKey reads a file and returns the PEM encoded certificate and key
@@ -62,14 +66,27 @@ func readPEMCertKey(filename string) (certs []byte, key []byte, err error) {
 // a custom rootCertFilename is non-empty, it must point to a valid PEM file,
 // otherwise the function will return an error.
 func Transport(opts TransportOptions) (http.RoundTripper, error) {
-	// copied from net/http
-	tr := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
+	dc := (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
-		}).DialContext,
+		}).DialContext
+		
+	// copied from net/http
+	tr := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: func (ctx context.Context, network, address string) (net.Conn, error) {
+			c, err := dc(ctx, network, address)
+			if err != nil {
+				return c, err
+			}
+			if opts.TcpSendBufferSize != 0 {
+				if tc, ok := c.(*net.TCPConn); ok {
+					tc.SetWriteBuffer(opts.TcpSendBufferSize * 1024)
+				}
+			}
+			return c, err
+		},
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   100,
 		IdleConnTimeout:       90 * time.Second,
