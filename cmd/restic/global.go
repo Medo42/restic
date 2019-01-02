@@ -57,6 +57,7 @@ type GlobalOptions struct {
 
 	LimitUploadKb   int
 	LimitDownloadKb int
+	TcpSendBufferSize int
 
 	ctx      context.Context
 	password string
@@ -102,6 +103,7 @@ func init() {
 	f.BoolVar(&globalOptions.CleanupCache, "cleanup-cache", false, "auto remove old cache directories")
 	f.IntVar(&globalOptions.LimitUploadKb, "limit-upload", 0, "limits uploads to a maximum rate in KiB/s. (default: unlimited)")
 	f.IntVar(&globalOptions.LimitDownloadKb, "limit-download", 0, "limits downloads to a maximum rate in KiB/s. (default: unlimited)")
+	f.IntVar(&globalOptions.TcpSendBufferSize, "tcp-sendbuffer-size", 0, "sets the size of the TCP send buffer in KiB. (default: system defined)")
 	f.StringSliceVarP(&globalOptions.Options, "option", "o", []string{}, "set extended option (`key=value`, can be specified multiple times)")
 
 	restoreTerminal()
@@ -562,6 +564,7 @@ func open(s string, gopts GlobalOptions, opts options.Options) (restic.Backend, 
 	tropts := backend.TransportOptions{
 		RootCertFilenames:        globalOptions.CACerts,
 		TLSClientCertKeyFilename: globalOptions.TLSClientCert,
+		TcpSendBufferSize:        globalOptions.TcpSendBufferSize,
 	}
 	rt, err := backend.Transport(tropts)
 	if err != nil {
