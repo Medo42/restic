@@ -253,7 +253,11 @@ func (be *b2Backend) Remove(ctx context.Context, h restic.Handle) error {
 	defer be.sem.ReleaseToken()
 
 	obj := be.bucket.Object(be.Filename(h))
-	return errors.Wrap(obj.Delete(ctx), "Delete")
+	if be.cfg.SoftDelete {
+		return errors.Wrap(obj.Hide(ctx), "Hide")
+	} else {
+		return errors.Wrap(obj.Delete(ctx), "Delete")
+	}
 }
 
 type semLocker struct {

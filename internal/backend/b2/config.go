@@ -18,12 +18,14 @@ type Config struct {
 	Prefix    string
 
 	Connections uint `option:"connections" help:"set a limit for the number of concurrent connections (default: 5)"`
+	SoftDelete bool `option:"softdelete" help:"hide files instead of deleting (default: false)"`
 }
 
 // NewConfig returns a new config with default options applied.
 func NewConfig() Config {
 	return Config{
 		Connections: 5,
+		SoftDelete: false,
 	}
 }
 
