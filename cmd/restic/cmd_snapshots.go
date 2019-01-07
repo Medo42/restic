@@ -184,7 +184,7 @@ func PrintSnapshots(stdout io.Writer, list restic.Snapshots, reasons []restic.Ke
 	for _, sn := range list {
 		data := snapshot{
 			ID:        sn.ID().Str(),
-			Timestamp: sn.Time.Format(TimeFormat),
+			Timestamp: sn.Time.Local().Format(TimeFormat),
 			Hostname:  sn.Hostname,
 			Tags:      sn.Tags,
 			Paths:     sn.Paths,
@@ -195,7 +195,7 @@ func PrintSnapshots(stdout io.Writer, list restic.Snapshots, reasons []restic.Ke
 			data.Reasons = keepReasons[*id].Matches
 		}
 
-		if len(sn.Paths) > 1 {
+		if len(sn.Paths) > 1 && !compact {
 			multiline = true
 		}
 

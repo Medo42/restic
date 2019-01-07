@@ -45,8 +45,12 @@ given as the arguments.
 	},
 	DisableAutoGenTag: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if backupOptions.Stdin && backupOptions.FilesFrom == "-" {
-			return errors.Fatal("cannot use both `--stdin` and `--files-from -`")
+		if backupOptions.Stdin {
+			for _, filename := range backupOptions.FilesFrom {
+				if filename == "-" {
+					return errors.Fatal("cannot use both `--stdin` and `--files-from -`")
+				}
+			}
 		}
 
 		var t tomb.Tomb
@@ -75,7 +79,7 @@ type BackupOptions struct {
 	StdinFilename    string
 	Tags             []string
 	Host             string
-	FilesFrom        string
+	FilesFrom        []string
 	TimeStamp        string
 	WithAtime        bool
 }
@@ -97,11 +101,11 @@ func init() {
 	f.StringVar(&backupOptions.StdinFilename, "stdin-filename", "stdin", "file name to use when reading from stdin")
 	f.StringArrayVar(&backupOptions.Tags, "tag", nil, "add a `tag` for the new snapshot (can be specified multiple times)")
 
-	f.StringVar(&backupOptions.Host, "host", "H", "set the `hostname` for the snapshot manually. To prevent an expensive rescan use the \"parent\" flag")
+	f.StringVarP(&backupOptions.Host, "host", "H", "", "set the `hostname` for the snapshot manually. To prevent an expensive rescan use the \"parent\" flag")
 	f.StringVar(&backupOptions.Host, "hostname", "", "set the `hostname` for the snapshot manually")
 	f.MarkDeprecated("hostname", "use --host")
 
-	f.StringVar(&backupOptions.FilesFrom, "files-from", "", "read the files to backup from file (can be combined with file args)")
+	f.StringArrayVar(&backupOptions.FilesFrom, "files-from", nil, "read the files to backup from file (can be combined with file args/can be specified multiple times)")
 	f.StringVar(&backupOptions.TimeStamp, "time", "", "time of the backup (ex. '2012-11-01 22:08:41') (default: now)")
 	f.BoolVar(&backupOptions.WithAtime, "with-atime", false, "store the atime for all files and directories")
 }
@@ -175,12 +179,16 @@ func readLinesFromFile(filename string) ([]string, error) {
 
 // Check returns an error when an invalid combination of options was set.
 func (opts BackupOptions) Check(gopts GlobalOptions, args []string) error {
-	if opts.FilesFrom == "-" && gopts.password == "" {
-		return errors.Fatal("unable to read password from stdin when data is to be read from stdin, use --password-file or $RESTIC_PASSWORD")
+	if gopts.password == "" {
+		for _, filename := range opts.FilesFrom {
+			if filename == "-" {
+				return errors.Fatal("unable to read password from stdin when data is to be read from stdin, use --password-file or $RESTIC_PASSWORD")
+			}
+		}
 	}
 
 	if opts.Stdin {
-		if opts.FilesFrom != "" {
+		if len(opts.FilesFrom) > 0 {
 			return errors.Fatal("--stdin and --files-from cannot be used together")
 		}
 
@@ -302,20 +310,25 @@ func collectTargets(opts BackupOptions, args []string) (targets []string, err er
 		return nil, nil
 	}
 
-	fromfile, err := readLinesFromFile(opts.FilesFrom)
-	if err != nil {
-		return nil, err
-	}
-
-	// expand wildcards
 	var lines []string
-	for _, line := range fromfile {
-		var expanded []string
-		expanded, err := filepath.Glob(line)
+	for _, file := range opts.FilesFrom {
+		fromfile, err := readLinesFromFile(file)
 		if err != nil {
-			return nil, errors.WithMessage(err, fmt.Sprintf("pattern: %s", line))
+			return nil, err
 		}
-		lines = append(lines, expanded...)
+
+		// expand wildcards
+		for _, line := range fromfile {
+			var expanded []string
+			expanded, err := filepath.Glob(line)
+			if err != nil {
+				return nil, errors.WithMessage(err, fmt.Sprintf("pattern: %s", line))
+			}
+			if len(expanded) == 0 {
+				Warnf("pattern %q does not match any files, skipping\n", line)
+			}
+			lines = append(lines, expanded...)
+		}
 	}
 
 	// merge files from files-from into normal args so we can reuse the normal
@@ -374,13 +387,19 @@ func runBackup(opts BackupOptions, gopts GlobalOptions, term *termstatus.Termina
 
 	timeStamp := time.Now()
 	if opts.TimeStamp != "" {
-		timeStamp, err = time.Parse(TimeFormat, opts.TimeStamp)
+		timeStamp, err = time.ParseInLocation(TimeFormat, opts.TimeStamp, time.Local)
 		if err != nil {
 			return errors.Fatalf("error in time option: %v\n", err)
 		}
 	}
 
 	var t tomb.Tomb
+
+	term.Print("open repository\n")
+	repo, err := OpenRepository(gopts)
+	if err != nil {
+		return err
+	}
 
 	p := ui.NewBackup(term, gopts.verbosity)
 
@@ -402,12 +421,6 @@ func runBackup(opts BackupOptions, gopts GlobalOptions, term *termstatus.Termina
 	}
 
 	t.Go(func() error { return p.Run(t.Context(gopts.ctx)) })
-
-	p.V("open repository")
-	repo, err := OpenRepository(gopts)
-	if err != nil {
-		return err
-	}
 
 	p.V("lock repository")
 	lock, err := lockRepo(repo)

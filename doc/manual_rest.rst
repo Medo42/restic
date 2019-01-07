@@ -47,6 +47,7 @@ Usage help is available:
           --cleanup-cache            auto remove old cache directories
       -h, --help                     help for restic
           --json                     set output mode to JSON for commands that support it
+          --key-hint string          key ID of key to try decrypting first (default: $RESTIC_KEY_HINT)
           --limit-download int       limits downloads to a maximum rate in KiB/s. (default: unlimited)
           --limit-upload int         limits uploads to a maximum rate in KiB/s. (default: unlimited)
           --no-cache                 do not use a local cache
@@ -80,7 +81,7 @@ command:
           --exclude-caches                   excludes cache directories that are marked with a CACHEDIR.TAG file
           --exclude-file file                read exclude patterns from a file (can be specified multiple times)
           --exclude-if-present stringArray   takes filename[:header], exclude contents of directories containing filename (except filename itself) if header of that file is as provided (can be specified multiple times)
-          --files-from string                read the files to backup from file (can be combined with file args)
+          --files-from string                read the files to backup from file (can be combined with file args/can be specified multiple times)
       -f, --force                            force re-reading the target files/directories (overrides the "parent" flag)
       -h, --help                             help for backup
           --hostname hostname                set the hostname for the snapshot manually. To prevent an expensive rescan use the "parent" flag
@@ -97,6 +98,7 @@ command:
           --cache-dir string         set the cache directory. (default: use system default cache directory)
           --cleanup-cache            auto remove old cache directories
           --json                     set output mode to JSON for commands that support it
+          --key-hint string          key ID of key to try decrypting first (default: $RESTIC_KEY_HINT)
           --limit-download int       limits downloads to a maximum rate in KiB/s. (default: unlimited)
           --limit-upload int         limits uploads to a maximum rate in KiB/s. (default: unlimited)
           --no-cache                 do not use a local cache
@@ -179,7 +181,7 @@ locks with the following command:
     d369ccc7d126594950bf74f0a348d5d98d9e99f3215082eb69bf02dc9b3e464c
 
 The ``find`` command searches for a given
-`pattern <http://golang.org/pkg/path/filepath/#Match>`__ in the
+`pattern <https://golang.org/pkg/path/filepath/#Match>`__ in the
 repository.
 
 .. code-block:: console
